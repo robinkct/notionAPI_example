@@ -23,6 +23,18 @@ def demo_filters(notion: NotionAPI, database_id: str, page_ids: list):
         "關聯過濾": {
             "property": "Related Tasks",
             "relation": {"contains": page_ids[0] if page_ids else ""}
+        },
+        "Rollup 總和過濾": {
+            "property": "Total Score",
+            "rollup": {
+                "number": {"greater_than": 100}
+            }
+        },
+        "Rollup 計數過濾": {
+            "property": "Task Count",
+            "rollup": {
+                "number": {"greater_than": 0}
+            }
         }
     }
 
@@ -96,36 +108,60 @@ def demo_database_properties(notion: NotionAPI, database_id: str):
     # 動態創建並測試過濾器
     print("\n=== 動態過濾測試 ===")
     for prop_name, prop_type in properties.items():
+        filter_params = None
+        
+        # 根據屬性類型創建對應的過濾器
         if prop_type == "select":
+            filter_params = {
+                "property": prop_name,
+                "select": {"equals": "High"}
+            }
+        elif prop_type == "number":
+            filter_params = {
+                "property": prop_name,
+                "number": {"greater_than": 50}
+            }
+        elif prop_type == "rollup":
+            filter_params = {
+                "property": prop_name,
+                "rollup": {
+                    "number": {"greater_than": 100}
+                }
+            }
+        elif prop_type == "relation":
+            filter_params = {
+                "property": prop_name,
+                "relation": {"is_not_empty": True}
+            }
+            
+        if filter_params:
             results = notion.query_database(
                 database_id,
-                filter_params={
-                    "property": prop_name,
-                    "select": {"equals": "High"}
-                }
+                filter_params=filter_params
             )
-            print(f"\n使用 {prop_name} 過濾結果：")
+            print(f"\n使用 {prop_name}({prop_type}) 過濾結果：")
             print(json.dumps(results, indent=2, ensure_ascii=False))
 
 def main():
-    root_page_id = '1c6db9568fde8068bc49d3184604370f' # https://www.notion.so/1c6db9568fde8068bc49d3184604370f
+    root_page_id = '1c6db9568fde8068bc49d3184604370f'
     token = NotionConfig.NOTION_TOKEN
     notion = NotionAPI(token)
 
     # 執行示例
     database_id = create_example_database(notion, root_page_id)
     if database_id:
-        add_relation_property(notion, database_id)
-        created_pages = create_example_pages(notion, database_id)
-        create_page_relation(notion, database_id, created_pages)
-        
-        # 添加數據庫屬性展示
-        demo_database_properties(notion, database_id)
-        
-        # 原有的演示
-        demo_filters(notion, database_id, created_pages)
-        results = demo_sorting(notion, database_id)
-        demo_property_extraction(notion, results)
+        # 添加關聯和 rollup 屬性
+        if add_relation_property(notion, database_id):
+            # 創建頁面和關聯
+            created_pages = create_example_pages(notion, database_id)
+            if created_pages:
+                create_page_relation(notion, database_id, created_pages)
+                
+                # 展示和測試
+                demo_database_properties(notion, database_id)
+                demo_filters(notion, database_id, created_pages)
+                results = demo_sorting(notion, database_id)
+                demo_property_extraction(notion, results)
 
     demo_image_operations(notion, root_page_id)
 

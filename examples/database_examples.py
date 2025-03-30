@@ -1,5 +1,6 @@
 from notion.api import NotionAPI
-import json
+from notion.config import NotionConfig
+import time
 
 def create_example_database(notion: NotionAPI, root_page_id: str) -> str:
     """創建示例數據庫"""
@@ -48,6 +49,7 @@ def create_example_database(notion: NotionAPI, root_page_id: str) -> str:
 
 def add_relation_property(notion: NotionAPI, database_id: str):
     """添加關聯屬性到數據庫"""
+    # 首先只添加關聯屬性
     relation_property = {
         "Related Tasks": {
             "relation": {
@@ -56,59 +58,104 @@ def add_relation_property(notion: NotionAPI, database_id: str):
             }
         }
     }
-    notion.update_database(database_id, properties=relation_property)
+    
+    # 更新數據庫添加關聯屬性
+    response = notion.update_database(database_id, properties=relation_property)
+    
+    # 確保關聯屬性創建成功
+    if response:
+        print("關聯屬性創建成功")
+        # 等待一下確保關聯屬性已經生效
+        time.sleep(1)
+        
+        # 然後添加 Rollup 屬性
+        rollup_properties = {
+            "Total Score": {
+                "rollup": {
+                    "relation_property_name": "Related Tasks",
+                    "rollup_property_name": "Score",  # 必須指定
+                    "function": "sum"  # 使用字符串而不是枚舉
+                }
+            },
+            "Task Count": {
+                "rollup": {
+                    "relation_property_name": "Related Tasks",
+                    "rollup_property_name": "Name",  # 對於計數，使用任何存在的屬性都可以
+                    "function": "count"
+                }
+            }
+        }
+        
+        # 更新數據庫添加 Rollup 屬性
+        response = notion.update_database(database_id, properties=rollup_properties)
+        if response:
+            print("Rollup 屬性創建成功")
+            return True
+    
+    return False
 
-def demonstrate_database_properties(notion: NotionAPI, database_id: str):
-    """展示如何獲取和使用數據庫屬性"""
-    # 獲取所有屬性
-    properties = notion.get_database_properties(database_id)
+def create_page_relation(notion: NotionAPI, database_id: str, page_ids: list):
+    """創建頁面之間的關聯"""
+    if len(page_ids) >= 2:
+        relation_update = {
+            "Name": {
+                "title": [{"text": {"content": "Task 2 (Updated)"}}]
+            },
+            "Related Tasks": {
+                "relation": [{"id": page_ids[0]}]
+            }
+        }
+        
+        # 在創建關聯之前先確認屬性存在
+        properties = notion.get_database_properties(database_id)
+        if "Related Tasks" not in properties:
+            print("關聯屬性尚未創建成功，請稍後再試")
+            return False
+            
+        result = notion.create_page(database_id=database_id, properties=relation_update)
+        if result:
+            print("關聯頁面創建成功")
+            return True
     
-    print("\n=== 數據庫屬性 ===")
-    print("\n可用的過濾屬性：")
-    for prop_name, prop_type in properties.items():
-        print(f"- {prop_name}: {prop_type}")
+    return False
+
+def create_example_pages(notion: NotionAPI, database_id: str) -> list:
+    """創建示例頁面"""
+    example_pages = [
+        {
+            "Name": {"title": [{"text": {"content": "High Priority Task"}}]},
+            "Priority": {"select": {"name": "High"}},
+            "Tags": {"multi_select": [{"name": "Work"}, {"name": "Urgent"}]},
+            "Score": {"number": 90},
+            "Complete": {"checkbox": False}
+        },
+        {
+            "Name": {"title": [{"text": {"content": "Medium Priority Task"}}]},
+            "Priority": {"select": {"name": "Medium"}},
+            "Tags": {"multi_select": [{"name": "Personal"}]},
+            "Score": {"number": 75},
+            "Complete": {"checkbox": True}
+        }
+    ]
+
+    created_pages = []
+    for page_properties in example_pages:
+        result = notion.create_page(
+            database_id=database_id,
+            properties=page_properties
+        )
+        if result:
+            created_pages.append(result["id"])
+            print(f"創建頁面成功: {page_properties['Name']['title'][0]['text']['content']}")
     
-    # 展示如何為每種類型創建過濾器
-    print("\n各類型的過濾器示例：")
-    filter_examples = {}
+    # 等待一下確保頁面創建完成
+    if created_pages:
+        time.sleep(1)
     
-    for prop_name, prop_type in properties.items():
-        if prop_type == "title":
-            filter_examples[prop_name] = {
-                "property": prop_name,
-                "title": {"contains": "任務"}
-            }
-        elif prop_type == "select":
-            filter_examples[prop_name] = {
-                "property": prop_name,
-                "select": {"equals": "High"}
-            }
-        elif prop_type == "multi_select":
-            filter_examples[prop_name] = {
-                "property": prop_name,
-                "multi_select": {"contains": "工作"}
-            }
-        elif prop_type == "number":
-            filter_examples[prop_name] = {
-                "property": prop_name,
-                "number": {"greater_than": 50}
-            }
-        elif prop_type == "checkbox":
-            filter_examples[prop_name] = {
-                "property": prop_name,
-                "checkbox": {"equals": True}
-            }
-        elif prop_type == "date":
-            filter_examples[prop_name] = {
-                "property": prop_name,
-                "date": {"past_week": {}}
-            }
-        elif prop_type == "relation":
-            filter_examples[prop_name] = {
-                "property": prop_name,
-                "relation": {"contains": "page_id"}
-            }
-    
-    print("\n過濾器示例：")
-    print(json.dumps(filter_examples, indent=2, ensure_ascii=False))
+    return created_pages
+
+# 移除所有模組層級的代碼執行
+if __name__ == "__main__":
+    # 這裡可以放測試代碼
+    pass
 
