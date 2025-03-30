@@ -194,3 +194,32 @@ class NotionAPI(NotionRequestHandler):
             return response.json()['data']['link']
         else:
             raise Exception(f"Imgur 上传失败: {response.text}")
+
+    def get_database_properties(self, database_id: str) -> dict:
+        """獲取數據庫所有可過濾的屬性信息
+        
+        Args:
+            database_id: 數據庫 ID
+            
+        Returns:
+            dict: 屬性名稱及其類型的映射，例如：
+            {
+                "Name": "title",
+                "Priority": "select",
+                "Tags": "multi_select",
+                "Score": "number",
+                ...
+            }
+        """
+        url = f"{NotionConfig.BASE_URL}/databases/{database_id}"
+        response = self._make_request("GET", url)
+        
+        if not response or 'properties' not in response:
+            return {}
+        
+        properties = {}
+        for prop_name, prop_info in response['properties'].items():
+            prop_type = prop_info.get('type')
+            properties[prop_name] = prop_type
+        
+        return properties

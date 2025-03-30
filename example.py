@@ -83,6 +83,30 @@ def demo_image_operations(notion: NotionAPI, page_id: str):
     
     notion.append_blocks(page_id, blocks)
 
+def demo_database_properties(notion: NotionAPI, database_id: str):
+    """展示數據庫屬性和動態過濾功能"""
+    # 獲取所有屬性
+    properties = notion.get_database_properties(database_id)
+    
+    print("\n=== 數據庫屬性 ===")
+    print("\n可用的過濾屬性：")
+    for prop_name, prop_type in properties.items():
+        print(f"- {prop_name}: {prop_type}")
+    
+    # 動態創建並測試過濾器
+    print("\n=== 動態過濾測試 ===")
+    for prop_name, prop_type in properties.items():
+        if prop_type == "select":
+            results = notion.query_database(
+                database_id,
+                filter_params={
+                    "property": prop_name,
+                    "select": {"equals": "High"}
+                }
+            )
+            print(f"\n使用 {prop_name} 過濾結果：")
+            print(json.dumps(results, indent=2, ensure_ascii=False))
+
 def main():
     root_page_id = '1c6db9568fde8068bc49d3184604370f' # https://www.notion.so/1c6db9568fde8068bc49d3184604370f
     token = NotionConfig.NOTION_TOKEN
@@ -94,6 +118,11 @@ def main():
         add_relation_property(notion, database_id)
         created_pages = create_example_pages(notion, database_id)
         create_page_relation(notion, database_id, created_pages)
+        
+        # 添加數據庫屬性展示
+        demo_database_properties(notion, database_id)
+        
+        # 原有的演示
         demo_filters(notion, database_id, created_pages)
         results = demo_sorting(notion, database_id)
         demo_property_extraction(notion, results)
