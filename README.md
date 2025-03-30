@@ -29,27 +29,29 @@
 
 ## 安裝
 
-1. 克隆專案：
+克隆專案：
 ```bash
-git clone https://github.com/your-username/notion-api-tool.git
-cd notion-api-tool
-```
-
-2. 安裝依賴：
-```bash
-pip install -r requirements.txt
+!git clone https://github.com/robinkct/notionAPI_example.git
+cd notionAPI_example
 ```
 
 ## 配置
+1. 獲取必要的認證：
+   - NotionAPI Token: 從 [Notion Developers](https://developers.notion.com/) 獲取：[可參考](https://dragonflykuo.com/%e4%b8%b2%e6%8e%a5-notion-api%e7%94%a8-python-%e8%87%aa%e7%94%b1%e6%93%8d%e4%bd%9c-notion/)
+   - (須本地上傳圖片才需要) Imgur Client ID: 從 [Imgur API](https://api.imgur.com/oauth2/addclient) 獲取
 
-1. 在專案根目錄創建 `.env` 文件：
-```env
+2. 到 notion/config.py 中新增：
+```config.py
 NOTION_TOKEN=your_notion_token
 IMGUR_CLIENT_ID=your_imgur_client_id
 ```
 
-2. 獲取必要的認證：
-   - Notion Token: 從 [Notion Developers](https://developers.notion.com/) 獲取
-   - Imgur Client ID: 從 [Imgur API](https://api.imgur.com/oauth2/addclient) 獲取
+3. 打開 Notion 頁面，將第一步申請的 NotoinAPI 與頁面連接
+![示意圖](./image/notion_connection.jpg)
 
-## 專案結構 
+4. 從 Notion 頁面取得頁面 ID，填入 main.py
+```
+root_page_id = 'your page ID'
+```
+
+5. python example.py
