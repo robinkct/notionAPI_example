@@ -9,3 +9,10 @@ __pycache__/
 *.pyw
 *.pyz
 
+money.py
+
+month/
+event/
+history/
+
+*.json
