@@ -30,7 +30,8 @@ def create_example_database(notion: NotionAPI, root_page_id: str) -> str:
         "Score": {"number": {}},
         "Website": {"url": {}},
         "Contact": {"email": {}},
-        "Phone": {"phone_number": {}}
+        "Phone": {"phone_number": {}},
+        "File": {"files": {}}  # 添加 Files & Media 屬性
     }
 
     example_db = notion.create_database(
@@ -153,6 +154,76 @@ def create_example_pages(notion: NotionAPI, database_id: str) -> list:
         time.sleep(1)
     
     return created_pages
+
+def add_files_property(notion: NotionAPI, database_id: str, property_name: str = "File"):
+    """添加 Files & Media 屬性到數據庫
+    
+    Args:
+        notion: NotionAPI 實例
+        database_id: 數據庫 ID
+        property_name: 屬性名稱，默認為 "File"
+        
+    Returns:
+        bool: 是否成功添加屬性
+    """
+    # 定義 Files & Media 屬性
+    files_property = {
+        property_name: {
+            "files": {}
+        }
+    }
+    
+    # 更新數據庫添加文件屬性
+    response = notion.update_database(database_id, properties=files_property)
+    
+    if response:
+        print(f"Files & Media 屬性 '{property_name}' 創建成功")
+        return True
+    
+    return False
+
+def update_page_with_file(notion: NotionAPI, database_id: str, property_name: str = "File", file_path: str = "image/1.png"):
+    """更新頁面添加文件
+    
+    Args:
+        notion: NotionAPI 實例
+        database_id: 數據庫 ID
+        property_name: 屬性名稱，默認為 "File"
+        file_path: 文件路徑，默認為 "image/1.png"
+        
+    Returns:
+        bool: 是否成功更新頁面
+    """
+    properties = {
+        "Name": {
+            "title": [{"text": {"content": "Page with File"}}]
+        },
+        property_name: {
+            "files": [
+                {
+                    "name": file_path,
+                    "type": "external",
+                    "external": {
+                        "url": file_path
+                    }
+                }
+            ]
+        }
+    }
+    
+    result = notion.create_page(database_id=database_id, properties=properties)
+    if result:
+        print(f"成功創建頁面並添加文件: {file_path}")
+        return True
+    
+    return False
+
+def create_example_with_file(notion: NotionAPI, database_id: str):
+    """創建帶有文件的示例"""
+    # 1. 添加 Files & Media 屬性
+    if add_files_property(notion, database_id):
+        # 2. 創建頁面並添加文件
+        update_page_with_file(notion, database_id)
 
 # 移除所有模組層級的代碼執行
 if __name__ == "__main__":

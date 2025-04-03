@@ -1,5 +1,10 @@
 from notion.api import NotionAPI
-from examples.database_examples import create_example_database, add_relation_property
+from examples.database_examples import (
+    create_example_database, 
+    add_relation_property,
+    add_files_property,
+    update_page_with_file
+)
 from examples.page_examples import create_example_pages, create_page_relation
 from notion.builders import BlockBuilder
 import json
@@ -142,6 +147,86 @@ def demo_database_properties(notion: NotionAPI, database_id: str):
             print(f"\n使用 {prop_name}({prop_type}) 過濾結果：")
             print(json.dumps(results, indent=2, ensure_ascii=False))
 
+def demo_files_property(notion: NotionAPI, database_id: str):
+    """展示 Files & Media 屬性的使用"""
+    print("\n=== Files & Media 屬性示例 ===")
+    
+    try:
+        # 上傳圖片到 imgur
+        image_url = notion.upload_to_imgur("image/1.png")
+        
+        if not image_url:
+            print("圖片上傳失敗")
+            return None
+        
+        # 添加 Files & Media 屬性
+        if add_files_property(notion, database_id):
+            # 使用獲取到的 imgur URL 創建頁面
+            properties = {
+                "Name": {
+                    "title": [{"text": {"content": "Page with File"}}]
+                },
+                "File": {
+                    "files": [
+                        {
+                            "name": "1.png",
+                            "type": "external",
+                            "external": {
+                                "url": image_url
+                            }
+                        }
+                    ]
+                }
+            }
+            
+            result = notion.create_page(database_id=database_id, properties=properties)
+            if result:
+                print(f"成功創建頁面並添加圖片: {image_url}")
+                return result["id"]
+            else:
+                print("創建頁面失敗")
+                return None
+    except Exception as e:
+        print(f"圖片上傳或頁面創建失敗: {e}")
+        return None
+
+def update_page_file(notion: NotionAPI, page_id: str, image_path: str = "image/2.png"):
+    """更新頁面的 File 屬性"""
+    try:
+        # 上傳新圖片到 imgur
+        new_image_url = notion.upload_to_imgur(image_path)
+        if new_image_url:
+            update_properties = {
+                "properties": {
+                    "File": {
+                        "files": [
+                            {
+                                "name": image_path.split("/")[-1],
+                                "type": "external",
+                                "external": {
+                                    "url": new_image_url
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+            
+            result = notion._make_request(
+                "PATCH", 
+                f"{NotionConfig.BASE_URL}/pages/{page_id}",
+                update_properties
+            )
+            if result:
+                print(f"成功更新頁面圖片: {new_image_url}")
+                return True
+            else:
+                print("更新頁面失敗")
+                return False
+    except Exception as e:
+        print(f"更新圖片失敗: {e}")
+        return False
+
 def main():
     root_page_id = '1c6db9568fde8068bc49d3184604370f'
     token = NotionConfig.NOTION_TOKEN
@@ -158,12 +243,19 @@ def main():
                 create_page_relation(notion, database_id, created_pages)
                 
                 # 展示和測試
-                demo_database_properties(notion, database_id)
-                demo_filters(notion, database_id, created_pages)
-                results = demo_sorting(notion, database_id)
-                demo_property_extraction(notion, results)
+                #demo_database_properties(notion, database_id)
+                #demo_filters(notion, database_id, created_pages)
+                #results = demo_sorting(notion, database_id)
+                #demo_property_extraction(notion, results)
+        
+        # 創建帶有 image/1.png 的頁面
+        page_with_file = demo_files_property(notion, database_id)
+        
+        # 如果頁面創建成功，更新為 image/2.png
+        if page_with_file:
+            update_page_file(notion, page_with_file)
 
-    demo_image_operations(notion, root_page_id)
+    #demo_image_operations(notion, root_page_id)
 
 if __name__ == "__main__":
     main() 
