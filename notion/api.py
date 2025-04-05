@@ -348,3 +348,206 @@ class NotionAPI(NotionRequestHandler):
                     }
         
         return select_options
+
+    def validate_file_property(self, prop_name: str, file_data: dict) -> None:
+        """驗證文件屬性的格式是否正確
+        
+        Args:
+            prop_name: 屬性名稱
+            file_data: 文件數據字典
+            
+        Raises:
+            ValueError: 當文件格式不正確時
+        """
+        if not isinstance(file_data, dict):
+            raise ValueError(f"屬性 '{prop_name}' 的文件必須是字典格式")
+        
+        required_fields = {
+            "type": "external",
+            "name": str,
+            "external": {"url": str}
+        }
+        
+        # 檢查類型
+        if file_data.get("type") != "external":
+            raise ValueError(f"屬性 '{prop_name}' 的文件必須是外部類型")
+        
+        # 檢查文件名
+        if "name" not in file_data:
+            raise ValueError(f"屬性 '{prop_name}' 的文件必須包含名稱")
+        
+        # 檢查外部 URL
+        external = file_data.get("external", {})
+        if not isinstance(external, dict) or "url" not in external:
+            raise ValueError(f"屬性 '{prop_name}' 的文件必須包含外部 URL")
+
+    def validate_properties(self, properties: dict) -> None:
+        """驗證更新屬性的格式是否正確
+        
+        Args:
+            properties: 屬性字典
+            
+        Raises:
+            ValueError: 當屬性格式不正確時
+        """
+        for prop_name, prop_value in properties.items():
+            # 檢查是否為文件類型
+            if "files" not in prop_value:
+                raise ValueError(f"屬性 '{prop_name}' 必須是文件類型（包含 'files' 鍵）")
+            
+            files = prop_value["files"]
+            if not isinstance(files, list) or not files:
+                raise ValueError(f"屬性 '{prop_name}' 的 'files' 必須是非空列表")
+            
+            # 驗證每個文件
+            for file in files:
+                self.validate_file_property(prop_name, file)
+
+    def print_update_result(self, page_id: str, properties: dict) -> None:
+        """打印更新結果的詳細信息
+        
+        Args:
+            page_id: 頁面 ID
+            properties: 更新的屬性
+        """
+        print(f"成功更新頁面 {page_id} 的屬性")
+        for prop_name, prop_value in properties.items():
+            files = prop_value["files"]
+            for file in files:
+                print(f"- 更新屬性 '{prop_name}':")
+                print(f"  - 文件名稱: {file['name']}")
+                print(f"  - 文件 URL: {file['external']['url']}")
+
+    def create_file_property(self, file_name: str, file_url: str) -> dict:
+        """創建文件屬性的數據結構
+        
+        Args:
+            file_name: 文件名稱
+            file_url: 文件的外部 URL
+            
+        Returns:
+            dict: 文件屬性的數據結構
+        """
+        return {
+            "files": [
+                {
+                    "name": file_name,
+                    "type": "external",
+                    "external": {
+                        "url": file_url
+                    }
+                }
+            ]
+        }
+
+    def create_page_properties(self, properties: dict) -> dict:
+        """創建頁面屬性的數據結構
+        
+        Args:
+            properties: 屬性字典，例如：
+                {
+                    "File": {"url": "https://...", "name": "image.png"},
+                    "Name": "標題"
+                }
+                
+        Returns:
+            dict: 格式化後的屬性數據結構
+        """
+        formatted_properties = {}
+        
+        for prop_name, prop_value in properties.items():
+            if isinstance(prop_value, dict) and "url" in prop_value:
+                # 處理文件類型
+                formatted_properties[prop_name] = self.create_file_property(
+                    prop_value["name"],
+                    prop_value["url"]
+                )
+            elif prop_name == "Name":
+                # 處理標題
+                formatted_properties[prop_name] = {
+                    "title": [{"text": {"content": prop_value}}]
+                }
+            else:
+                # 其他類型直接使用
+                formatted_properties[prop_name] = prop_value
+        
+        return {"properties": formatted_properties}
+
+    def update_page_file(self, page_id: str, image_path: str) -> bool:
+        """更新頁面的 File 屬性
+        
+        Args:
+            page_id: Notion 頁面 ID
+            image_path: 圖片文件路徑
+            
+        Returns:
+            bool: 更新是否成功
+        """
+        try:
+            # 上傳新圖片到 imgur
+            new_image_url = self.upload_to_imgur(image_path)
+            if not new_image_url:
+                print("圖片上傳失敗")
+                return False
+            
+            # 創建更新屬性
+            file_name = image_path.split("/")[-1]
+            update_properties = self.create_page_properties({
+                "File": {
+                    "name": file_name,
+                    "url": new_image_url
+                }
+            })
+            
+            # 發送更新請求
+            url = f"{NotionConfig.BASE_URL}/pages/{page_id}"
+            result = self._make_request("PATCH", url, update_properties)
+            
+            if result:
+                print(f"成功更新頁面圖片: {new_image_url}")
+                return True
+            else:
+                print("更新頁面失敗")
+                return False
+            
+        except Exception as e:
+            print(f"更新圖片失敗: {e}")
+            return False
+
+    def update_page(self, page_id: str, properties: dict) -> dict:
+        """更新 Notion 頁面的屬性
+        
+        Args:
+            page_id: Notion 頁面 ID
+            properties: 要更新的屬性，例如：
+                {
+                    "File": {"url": "https://...", "name": "image.png"},
+                    "Name": "新標題"
+                }
+                
+        Returns:
+            dict: API 響應結果
+        """
+        try:
+            # 格式化屬性
+            update_properties = self.create_page_properties(properties)
+            
+            # 發送請求
+            url = f"{NotionConfig.BASE_URL}/pages/{page_id}"
+            result = self._make_request("PATCH", url, update_properties)
+            
+            if result:
+                print(f"成功更新頁面 {page_id}")
+                for prop_name, prop_value in properties.items():
+                    if isinstance(prop_value, dict) and "url" in prop_value:
+                        print(f"- 更新屬性 '{prop_name}':")
+                        print(f"  - 文件名稱: {prop_value['name']}")
+                        print(f"  - 文件 URL: {prop_value['url']}")
+                    else:
+                        print(f"- 更新屬性 '{prop_name}': {prop_value}")
+            
+            return result
+            
+        except Exception as e:
+            print(f"更新頁面失敗: {e}")
+            return None

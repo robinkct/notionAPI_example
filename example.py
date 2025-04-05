@@ -192,40 +192,7 @@ def demo_files_property(notion: NotionAPI, database_id: str):
 
 def update_page_file(notion: NotionAPI, page_id: str, image_path: str = "image/2.png"):
     """更新頁面的 File 屬性"""
-    try:
-        # 上傳新圖片到 imgur
-        new_image_url = notion.upload_to_imgur(image_path)
-        if new_image_url:
-            update_properties = {
-                "properties": {
-                    "File": {
-                        "files": [
-                            {
-                                "name": image_path.split("/")[-1],
-                                "type": "external",
-                                "external": {
-                                    "url": new_image_url
-                                }
-                            }
-                        ]
-                    }
-                }
-            }
-            
-            result = notion._make_request(
-                "PATCH", 
-                f"{NotionConfig.BASE_URL}/pages/{page_id}",
-                update_properties
-            )
-            if result:
-                print(f"成功更新頁面圖片: {new_image_url}")
-                return True
-            else:
-                print("更新頁面失敗")
-                return False
-    except Exception as e:
-        print(f"更新圖片失敗: {e}")
-        return False
+    return notion.update_page_file(page_id, image_path)
 
 def main():
     root_page_id = '1c6db9568fde8068bc49d3184604370f'
