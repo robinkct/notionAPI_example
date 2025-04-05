@@ -190,10 +190,6 @@ def demo_files_property(notion: NotionAPI, database_id: str):
         print(f"圖片上傳或頁面創建失敗: {e}")
         return None
 
-def update_page_file(notion: NotionAPI, page_id: str, image_path: str = "image/2.png"):
-    """更新頁面的 File 屬性"""
-    return notion.update_page_file(page_id, image_path)
-
 def main():
     root_page_id = '1c6db9568fde8068bc49d3184604370f'
     token = NotionConfig.NOTION_TOKEN
@@ -208,19 +204,20 @@ def main():
             created_pages = create_example_pages(notion, database_id)
             if created_pages:
                 create_page_relation(notion, database_id, created_pages)
-                
+                        
                 # 展示和測試
-                #demo_database_properties(notion, database_id)
-                #demo_filters(notion, database_id, created_pages)
-                #results = demo_sorting(notion, database_id)
-                #demo_property_extraction(notion, results)
-        
+                demo_database_properties(notion, database_id)
+                demo_filters(notion, database_id, created_pages)
+                results = demo_sorting(notion, database_id)
+                demo_property_extraction(notion, results)
+
         # 創建帶有 image/1.png 的頁面
         page_with_file = demo_files_property(notion, database_id)
         
         # 如果頁面創建成功，更新為 image/2.png
         if page_with_file:
-            update_page_file(notion, page_with_file)
+            property_name = "File"
+            notion.update_page_file(page_with_file, "image/2.png", property_name=property_name)
 
     #demo_image_operations(notion, root_page_id)
 

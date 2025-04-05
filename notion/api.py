@@ -4,6 +4,8 @@ from .config import NotionConfig
 from .extractors import PropertyValueExtractor
 import requests
 from base64 import b64encode
+import os
+from datetime import datetime
 
 
 class NotionAPI(NotionRequestHandler):
@@ -473,43 +475,56 @@ class NotionAPI(NotionRequestHandler):
         
         return {"properties": formatted_properties}
 
-    def update_page_file(self, page_id: str, image_path: str) -> bool:
-        """更新頁面的 File 屬性
+    def update_page_file(self, page_id: str, image_path: str, property_name: str = "File") -> bool:
+        """更新頁面的文件屬性
         
         Args:
             page_id: Notion 頁面 ID
             image_path: 圖片文件路徑
+            property_name: 要更新的屬性名稱（默認為 "File"）
             
         Returns:
             bool: 更新是否成功
         """
         try:
+            # 獲取文件修改時間
+            mod_time = os.path.getmtime(image_path)
+            current_mod_time = datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M:%S')
+            
             # 上傳新圖片到 imgur
             new_image_url = self.upload_to_imgur(image_path)
-            if not new_image_url:
-                print("圖片上傳失敗")
-                return False
-            
-            # 創建更新屬性
-            file_name = image_path.split("/")[-1]
-            update_properties = self.create_page_properties({
-                "File": {
-                    "name": file_name,
-                    "url": new_image_url
+            if new_image_url:
+                update_properties = {
+                    "properties": {
+                        property_name: {  # 使用傳入的屬性名稱
+                            "files": [
+                                {
+                                    "name": image_path.split("/")[-1],
+                                    "type": "external",
+                                    "external": {
+                                        "url": new_image_url
+                                    }
+                                }
+                            ]
+                        }
+                    }
                 }
-            })
-            
-            # 發送更新請求
-            url = f"{NotionConfig.BASE_URL}/pages/{page_id}"
-            result = self._make_request("PATCH", url, update_properties)
-            
-            if result:
-                print(f"成功更新頁面圖片: {new_image_url}")
-                return True
-            else:
-                print("更新頁面失敗")
-                return False
-            
+                
+                # 使用完整的 URL
+                url = f"{NotionConfig.BASE_URL}/pages/{page_id}"
+                result = self._make_request(
+                    "PATCH", 
+                    url,
+                    update_properties
+                )
+                
+                if result:
+                    print(f"成功更新頁面圖片: {new_image_url}")
+                    return True
+                else:
+                    print("更新頁面失敗")
+                    return False
+                
         except Exception as e:
             print(f"更新圖片失敗: {e}")
             return False
